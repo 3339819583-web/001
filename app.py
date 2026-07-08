@@ -1,6 +1,7 @@
 import os
 import time
 import secrets
+import sqlite3
 from functools import wraps
 from flask import Flask, render_template, request, redirect, session, abort
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -20,9 +21,41 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True     # 防止 JS 读取 cookie
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"    # 防止 CSRF 的一部分
 
 
-# ========== 用户数据库 ==========
+# ========== SQLite 数据库 ==========
 
-# [修复] 密码用哈希存储，不存明文
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "users.db")
+
+
+def log_debug(msg):
+    """打印调试信息到控制台（强制刷新）"""
+    print(f"[DEBUG] {msg}", flush=True)
+
+
+def init_db():
+    """初始化 SQLite 数据库"""
+    os.makedirs(os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            email TEXT,
+            phone TEXT
+        )
+    """)
+    # 插入默认用户
+    c.execute("INSERT OR IGNORE INTO users (username, password, email, phone) VALUES (?, ?, ?, ?)",
+              ("admin", generate_password_hash("admin123"), "admin@example.com", "13800138000"))
+    c.execute("INSERT OR IGNORE INTO users (username, password, email, phone) VALUES (?, ?, ?, ?)",
+              ("alice", generate_password_hash("alice2025"), "alice@example.com", "13900139001"))
+    conn.commit()
+    conn.close()
+
+
+# ========== 用户字典（用于登录验证，保持兼容）==========
+
 USERS = {
     "admin": {
         "username": "admin",
@@ -136,8 +169,6 @@ def login():
             session["username"] = username
             session.permanent = True  # 启用过期时间
             clear_login_attempts(client_ip)
-            # [修复] 登录成功重新生成 session ID，防止 session 固定攻击
-            session.regenerate()
             return redirect("/")
         else:
             record_failed_attempt(client_ip)
@@ -145,7 +176,8 @@ def login():
 
     # GET 请求，生成 CSRF Token
     generate_csrf_token()
-    return render_template("login.html")
+    success = request.args.get("success", "")
+    return render_template("login.html", success=success)
 
 
 @app.route("/logout")
@@ -154,7 +186,75 @@ def logout():
     return redirect("/")
 
 
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        email = request.form.get("email", "").strip()
+        phone = request.form.get("phone", "").strip()
+
+        # [修复] 使用参数化查询，防止 SQL 注入
+        sql = "INSERT INTO users (username, password, email, phone) VALUES (?, ?, ?, ?)"
+        log_debug(f"执行 SQL: {sql}")
+
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        try:
+            c.execute(sql, (username, generate_password_hash(password), email, phone))
+            conn.commit()
+            # 同步添加到 USERS 字典（保持登录兼容）
+            USERS[username] = {
+                "username": username,
+                "password": generate_password_hash(password),
+                "role": "user",
+                "email": email,
+                "phone": phone,
+                "balance": 0
+            }
+            return render_template("login.html", success="注册成功，请登录")
+        except Exception as e:
+            error_msg = f"注册失败：{str(e)}"
+            return render_template("register.html", error=error_msg)
+        finally:
+            conn.close()
+
+    return render_template("register.html")
+
+
+@app.route("/search")
+def search():
+    keyword = request.args.get("keyword", "").strip()
+    results = []
+    executed_sql = ""
+
+    if keyword:
+        # [修复] 使用参数化查询和 LIKE，防止 SQL 注入
+        executed_sql = "SELECT id, username, email, phone FROM users WHERE username LIKE ? OR email LIKE ?"
+        log_debug(f"执行 SQL: {executed_sql}")
+
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        try:
+            c.execute(executed_sql, (f"%{keyword}%", f"%{keyword}%"))
+            rows = c.fetchall()
+            for row in rows:
+                results.append({"id": row[0], "username": row[1], "email": row[2], "phone": row[3]})
+        except Exception as e:
+            log_debug(f"SQL 错误: {str(e)}")
+        finally:
+            conn.close()
+
+    username = session.get("username")
+    user_info = None
+    if username and username in USERS:
+        user_info = USERS[username]
+
+    return render_template("index.html", username=username, user=user_info, results=results, keyword=keyword)
+
+
 # [修复] 生产环境关闭 debug 模式，使用环境变量控制
 if __name__ == "__main__":
+    init_db()
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
     app.run(debug=debug_mode, host="0.0.0.0", port=5000)
