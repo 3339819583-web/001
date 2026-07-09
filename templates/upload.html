@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card upload-card">
+    <h2>上传头像</h2>
+
+    <form method="POST" action="/upload" enctype="multipart/form-data" class="upload-form">
+        <div class="form-group">
+            <label for="file">选择文件</label>
+            <input type="file" id="file" name="file" class="file-input">
+        </div>
+        <button type="submit" class="btn btn-submit">上传</button>
+    </form>
+
+    {% if error %}
+        <p class="error-msg">{{ error }}</p>
+    {% endif %}
+
+    {% if success %}
+        <div class="upload-success">
+            <p class="success-msg">{{ success }}</p>
+            <div class="preview-area">
+                <img src="{{ file_url }}" class="preview-img" alt="头像预览">
+            </div>
+            <p class="file-link">文件链接：<a href="{{ file_url }}" target="_blank">{{ file_url }}</a></p>
+        </div>
+    {% endif %}
+
+    <a href="/" class="btn btn-back">返回首页</a>
+</div>
+{% endblock %}

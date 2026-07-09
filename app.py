@@ -3,7 +3,7 @@ import time
 import secrets
 import sqlite3
 from functools import wraps
-from flask import Flask, render_template, request, redirect, session, abort
+from flask import Flask, render_template, request, redirect, session, abort, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -19,6 +19,9 @@ app.config["PERMANENT_SESSION_LIFETIME"] = 1800  # 30 分钟
 app.config["SESSION_COOKIE_SECURE"] = False      # 有 HTTPS 时设为 True
 app.config["SESSION_COOKIE_HTTPONLY"] = True     # 防止 JS 读取 cookie
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"    # 防止 CSRF 的一部分
+
+# 上传配置
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB
 
 
 # ========== SQLite 数据库 ==========
@@ -251,6 +254,72 @@ def search():
         user_info = USERS[username]
 
     return render_template("index.html", username=username, user=user_info, results=results, keyword=keyword)
+
+
+@app.route("/upload", methods=["GET", "POST"])
+def upload():
+    """头像上传"""
+    # 需要登录才能访问
+    if "username" not in session:
+        return redirect("/login")
+
+    if request.method == "POST":
+        file = request.files.get("file")
+        if file is None or file.filename == "":
+            return render_template("upload.html", error="请选择要上传的文件")
+
+        # 原始文件名（用于提取扩展名）
+        original_filename = file.filename
+
+        # [修复] 提取文件扩展名并转小写
+        ext = ""
+        if "." in original_filename:
+            ext = original_filename.rsplit(".", 1)[1].lower()
+
+        # [修复] 白名单校验：只允许图片扩展名
+        allowed_exts = {"jpg", "jpeg", "png", "gif"}
+        if ext not in allowed_exts:
+            return render_template("upload.html", error=f"不支持的文件类型 .{ext}，仅允许上传 jpg、jpeg、png、gif 格式的图片")
+
+        # [修复] 使用 UUID 重命名文件，防止路径穿越和文件名冲突
+        new_filename = f"{secrets.token_hex(16)}.{ext}"
+
+        # [修复] 验证文件内容的真实性（检查是否为真实图片）
+        file.seek(0)
+        file_content = file.read(512)
+        file.seek(0)
+
+        # 检测文件魔数
+        if file_content[:8] == b"\x89PNG\r\n\x1a\n":
+            detected_ext = "png"
+        elif file_content[:2] in (b"\xff\xd8",):
+            detected_ext = "jpg"
+        elif file_content[:6] in (b"GIF87a", b"GIF89a"):
+            detected_ext = "gif"
+        else:
+            return render_template("upload.html", error="文件格式验证失败，请上传真实的图片文件")
+
+        # [修复] 确保扩展名与文件内容一致
+        if detected_ext != ext:
+            return render_template("upload.html", error="文件后缀与内容不匹配，请上传正确的图片文件")
+
+        # 确保上传目录存在
+        upload_dir = os.path.join(app.root_path, "static", "uploads")
+        os.makedirs(upload_dir, exist_ok=True)
+
+        # 保存文件
+        file_path = os.path.join(upload_dir, new_filename)
+        file.save(file_path)
+
+        # [修复] 设置安全的文件权限
+        os.chmod(file_path, 0o644)
+
+        # 生成访问 URL
+        file_url = url_for("static", filename=f"uploads/{new_filename}")
+
+        return render_template("upload.html", success="上传成功！", file_url=file_url, filename=new_filename)
+
+    return render_template("upload.html")
 
 
 # [修复] 生产环境关闭 debug 模式，使用环境变量控制
