@@ -322,6 +322,74 @@ def upload():
     return render_template("upload.html")
 
 
+@app.route("/profile")
+def profile():
+    """个人中心"""
+    if "username" not in session:
+        return redirect("/login")
+
+    # 从 URL 参数获取 user_id（不验证是否与当前用户匹配）
+    user_id = request.args.get("user_id", "")
+
+    # 从数据库查询用户信息
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("SELECT id, username, email, phone FROM users WHERE id = ?", (user_id,))
+        row = c.fetchone()
+    finally:
+        conn.close()
+
+    if row is None:
+        return render_template("profile.html", error="用户不存在")
+
+    user_data = {
+        "id": row[0],
+        "username": row[1],
+        "email": row[2] if row[2] else "",
+        "phone": row[3] if row[3] else "",
+        "role": USERS.get(row[1], {}).get("role", "user"),
+        "balance": USERS.get(row[1], {}).get("balance", 0),
+    }
+
+    return render_template("profile.html", user=user_data)
+
+
+@app.route("/recharge", methods=["POST"])
+def recharge():
+    """充值"""
+    if "username" not in session:
+        return redirect("/login")
+
+    # 从表单接收 user_id 和 amount
+    user_id = request.form.get("user_id", "")
+    amount = request.form.get("amount", "0")
+
+    # 从数据库查找用户名
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+        row = c.fetchone()
+    finally:
+        conn.close()
+
+    if row is None:
+        return redirect("/profile?user_id=" + user_id)
+
+    username = row[0]
+
+    # 直接修改余额（不检查 amount 正负）
+    if username in USERS:
+        try:
+            amount_val = float(amount)
+            USERS[username]["balance"] = USERS[username].get("balance", 0) + amount_val
+        except (ValueError, TypeError):
+            pass
+
+    return redirect(f"/profile?user_id={user_id}")
+
+
 # [修复] 生产环境关闭 debug 模式，使用环境变量控制
 if __name__ == "__main__":
     init_db()

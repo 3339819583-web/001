@@ -399,3 +399,10 @@ body {
 .btn-back:hover {
     background: #7f8c8d;
 }
+
+/* ========== 个人中心 ========== */
+.balance {
+    font-weight: bold;
+    color: #e74c3c;
+    font-size: 18px;
+}
