@@ -331,6 +331,19 @@ def profile():
     # 从 URL 参数获取 user_id（不验证是否与当前用户匹配）
     user_id = request.args.get("user_id", "")
 
+    # 如果没有传 user_id，自动查询当前登录用户的 ID
+    if not user_id:
+        current_username = session.get("username", "")
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        try:
+            c.execute("SELECT id FROM users WHERE username = ?", (current_username,))
+            row = c.fetchone()
+            if row:
+                user_id = str(row[0])
+        finally:
+            conn.close()
+
     # 从数据库查询用户信息
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
