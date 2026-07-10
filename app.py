@@ -328,21 +328,27 @@ def profile():
     if "username" not in session:
         return redirect("/login")
 
-    # 从 URL 参数获取 user_id（不验证是否与当前用户匹配）
-    user_id = request.args.get("user_id", "")
+    current_username = session.get("username", "")
 
-    # 如果没有传 user_id，自动查询当前登录用户的 ID
-    if not user_id:
-        current_username = session.get("username", "")
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        try:
-            c.execute("SELECT id FROM users WHERE username = ?", (current_username,))
-            row = c.fetchone()
-            if row:
-                user_id = str(row[0])
-        finally:
-            conn.close()
+    # 获取当前登录用户的 ID
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("SELECT id FROM users WHERE username = ?", (current_username,))
+        current_row = c.fetchone()
+        if current_row is None:
+            return redirect("/login")
+        current_user_id = str(current_row[0])
+    finally:
+        conn.close()
+
+    # 从 URL 参数获取 user_id，默认使用当前用户
+    user_id = request.args.get("user_id", current_user_id)
+
+    # [修复] 验证：只有管理员可以查看其他用户，普通用户只能看自己
+    is_admin = USERS.get(current_username, {}).get("role") == "admin"
+    if user_id != current_user_id and not is_admin:
+        return render_template("profile.html", error="无权查看其他用户的资料")
 
     # 从数据库查询用户信息
     conn = sqlite3.connect(DB_PATH)
@@ -374,31 +380,44 @@ def recharge():
     if "username" not in session:
         return redirect("/login")
 
-    # 从表单接收 user_id 和 amount
-    user_id = request.form.get("user_id", "")
-    amount = request.form.get("amount", "0")
+    current_username = session.get("username", "")
 
-    # 从数据库查找用户名
+    # 获取当前登录用户的 ID
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
-        c.execute("SELECT username FROM users WHERE id = ?", (user_id,))
-        row = c.fetchone()
+        c.execute("SELECT id FROM users WHERE username = ?", (current_username,))
+        current_row = c.fetchone()
+        if current_row is None:
+            return redirect("/login")
+        current_user_id = str(current_row[0])
     finally:
         conn.close()
 
-    if row is None:
-        return redirect("/profile?user_id=" + user_id)
+    # 从表单接收 user_id 和 amount
+    user_id = request.form.get("user_id", "")
 
-    username = row[0]
+    # [修复] 只能给自己的账号充值
+    if user_id != current_user_id:
+        return redirect(f"/profile?user_id={current_user_id}")
 
-    # 直接修改余额（不检查 amount 正负）
-    if username in USERS:
-        try:
-            amount_val = float(amount)
-            USERS[username]["balance"] = USERS[username].get("balance", 0) + amount_val
-        except (ValueError, TypeError):
-            pass
+    amount = request.form.get("amount", "0")
+
+    # [修复] 检查金额必须为正数
+    try:
+        amount_val = float(amount)
+        if amount_val <= 0:
+            return redirect(f"/profile?user_id={user_id}")
+    except (ValueError, TypeError):
+        return redirect(f"/profile?user_id={user_id}")
+
+    # [修复] 限制单次充值金额不超过 10000
+    if amount_val > 10000:
+        amount_val = 10000
+
+    # 直接修改余额
+    if current_username in USERS:
+        USERS[current_username]["balance"] = USERS[current_username].get("balance", 0) + amount_val
 
     return redirect(f"/profile?user_id={user_id}")
 
