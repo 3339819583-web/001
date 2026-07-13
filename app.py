@@ -424,16 +424,24 @@ def recharge():
 
 @app.route("/page")
 def dynamic_page():
-    """动态页面加载（存在 LFI 漏洞）"""
-    # 从 URL 获取页面名称（不做任何过滤）
+    """动态页面加载"""
+    # 从 URL 获取页面名称
     name = request.args.get("name", "")
 
     if not name:
         return render_template("index.html", page_content="", page_title="")
 
-    # 尝试直接加载文件
+    # [修复] 白名单：只允许加载预定义的页面文件
+    allowed_pages = {"help", "about"}
+
+    # [修复] 过滤路径穿越字符和非法路径
+    if not name.isalnum() or name not in allowed_pages:
+        return render_template("index.html", page_content="页面不存在", page_title=name,
+                               username=session.get("username"),
+                               user=USERS.get(session.get("username")))
+
     pages_dir = os.path.join(app.root_path, "pages")
-    filepath = os.path.join(pages_dir, name)
+    filepath = os.path.join(pages_dir, name + ".html")
     page_content = ""
     page_title = name
 
@@ -441,13 +449,7 @@ def dynamic_page():
         with open(filepath, "r", encoding="utf-8") as f:
             page_content = f.read()
     else:
-        # 尝试加上 .html 后缀
-        filepath_html = filepath + ".html"
-        if os.path.exists(filepath_html):
-            with open(filepath_html, "r", encoding="utf-8") as f:
-                page_content = f.read()
-        else:
-            page_content = "页面不存在"
+        page_content = "页面不存在"
 
     # 获取当前用户信息显示在导航栏
     username = session.get("username")
