@@ -422,6 +422,43 @@ def recharge():
     return redirect(f"/profile?user_id={user_id}")
 
 
+@app.route("/page")
+def dynamic_page():
+    """动态页面加载（存在 LFI 漏洞）"""
+    # 从 URL 获取页面名称（不做任何过滤）
+    name = request.args.get("name", "")
+
+    if not name:
+        return render_template("index.html", page_content="", page_title="")
+
+    # 尝试直接加载文件
+    pages_dir = os.path.join(app.root_path, "pages")
+    filepath = os.path.join(pages_dir, name)
+    page_content = ""
+    page_title = name
+
+    if os.path.exists(filepath):
+        with open(filepath, "r", encoding="utf-8") as f:
+            page_content = f.read()
+    else:
+        # 尝试加上 .html 后缀
+        filepath_html = filepath + ".html"
+        if os.path.exists(filepath_html):
+            with open(filepath_html, "r", encoding="utf-8") as f:
+                page_content = f.read()
+        else:
+            page_content = "页面不存在"
+
+    # 获取当前用户信息显示在导航栏
+    username = session.get("username")
+    user_info = None
+    if username and username in USERS:
+        user_info = USERS[username]
+
+    return render_template("index.html", username=username, user=user_info,
+                           page_content=page_content, page_title=page_title)
+
+
 # [修复] 生产环境关闭 debug 模式，使用环境变量控制
 if __name__ == "__main__":
     init_db()

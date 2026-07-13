@@ -406,3 +406,65 @@ body {
     color: #e74c3c;
     font-size: 18px;
 }
+
+/* ========== 动态页面内容 ========== */
+.page-content {
+    margin: 24px 0;
+    padding: 20px;
+    background: #f9f9ff;
+    border: 1px solid #e0e0ff;
+    border-radius: 10px;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #667eea;
+}
+
+.page-header h3 {
+    font-size: 20px;
+    color: #333;
+    margin: 0;
+}
+
+.close-btn {
+    color: #999;
+    text-decoration: none;
+    font-size: 20px;
+    padding: 0 6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    color: #e74c3c;
+    background: #fef0ef;
+}
+
+.page-body {
+    font-size: 14px;
+    line-height: 1.8;
+    color: #444;
+}
+
+.page-body h2 {
+    color: #333;
+    font-size: 22px;
+    margin-bottom: 16px;
+}
+
+.page-body h3 {
+    color: #555;
+    font-size: 16px;
+    margin-top: 20px;
+    margin-bottom: 8px;
+}
+
+.page-body p {
+    margin-bottom: 12px;
+    padding-left: 4px;
+}
