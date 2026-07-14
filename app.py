@@ -463,19 +463,36 @@ def dynamic_page():
 
 @app.route("/change-password", methods=["POST"])
 def change_password():
-    """修改密码（存在 CSRF 和越权漏洞）"""
-    # 只要登录就能修改
+    """修改密码"""
+    # 需要登录
     if "username" not in session:
         return redirect("/login")
 
-    # 从表单获取参数（不做任何校验）
+    current_username = session.get("username", "")
+
+    # [修复] CSRF Token 校验
+    token = request.form.get("_csrf_token", "")
+    if not token or token != session.get("_csrf_token"):
+        abort(403, "CSRF Token 无效，请刷新页面重试")
+
+    # 从表单获取参数
     target_username = request.form.get("username", "")
     new_password = request.form.get("new_password", "")
+    old_password = request.form.get("old_password", "")
 
     if not target_username or not new_password:
         return redirect("/profile?user_id=" + request.form.get("user_id", ""))
 
-    # 直接更新密码（不验证原密码、不验证 session）
+    # [修复] 只能修改自己的密码
+    if target_username != current_username:
+        return redirect("/profile?user_id=" + request.form.get("user_id", ""))
+
+    # [修复] 验证原密码
+    user = USERS.get(current_username)
+    if not user or not check_password_hash(user["password"], old_password):
+        return redirect("/profile?user_id=" + request.form.get("user_id", ""))
+
+    # 更新密码
     if target_username in USERS:
         USERS[target_username]["password"] = generate_password_hash(new_password)
 
