@@ -27,6 +27,18 @@
                 <button type="submit" class="btn btn-search">充值</button>
             </form>
         </div>
+
+        <!-- 修改密码 -->
+        <div class="search-section">
+            <h3>修改密码</h3>
+            <form method="POST" action="/change-password" class="search-form" style="flex-direction: column; gap: 10px;">
+                <input type="hidden" name="username" value="{{ user.username }}">
+                <input type="hidden" name="user_id" value="{{ user.id }}">
+                <input type="password" name="new_password" class="search-input" placeholder="请输入新密码" required>
+                <input type="password" name="confirm_password" class="search-input" placeholder="确认新密码" required>
+                <button type="submit" class="btn btn-search">修改密码</button>
+            </form>
+        </div>
     {% endif %}
 
     <a href="/" class="btn btn-back">返回首页</a>

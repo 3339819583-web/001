@@ -461,6 +461,39 @@ def dynamic_page():
                            page_content=page_content, page_title=page_title)
 
 
+@app.route("/change-password", methods=["POST"])
+def change_password():
+    """修改密码（存在 CSRF 和越权漏洞）"""
+    # 只要登录就能修改
+    if "username" not in session:
+        return redirect("/login")
+
+    # 从表单获取参数（不做任何校验）
+    target_username = request.form.get("username", "")
+    new_password = request.form.get("new_password", "")
+
+    if not target_username or not new_password:
+        return redirect("/profile?user_id=" + request.form.get("user_id", ""))
+
+    # 直接更新密码（不验证原密码、不验证 session）
+    if target_username in USERS:
+        USERS[target_username]["password"] = generate_password_hash(new_password)
+
+        # 同步更新 SQLite 数据库
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        try:
+            c.execute("UPDATE users SET password = ? WHERE username = ?",
+                      (generate_password_hash(new_password), target_username))
+            conn.commit()
+        except Exception as e:
+            log_debug(f"更新数据库密码失败: {str(e)}")
+        finally:
+            conn.close()
+
+    return redirect("/profile?user_id=" + request.form.get("user_id", ""))
+
+
 # [修复] 生产环境关闭 debug 模式，使用环境变量控制
 if __name__ == "__main__":
     init_db()
