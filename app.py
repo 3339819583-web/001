@@ -515,7 +515,7 @@ def change_password():
 
 @app.route("/fetch-url", methods=["POST"])
 def fetch_url():
-    """URL 抓取功能（存在 SSRF 漏洞）"""
+    """URL 抓取功能"""
     if "username" not in session:
         return redirect("/login")
 
@@ -529,7 +529,44 @@ def fetch_url():
         return render_template("index.html", username=username, user=user_info,
                                fetch_result="", fetch_status="", fetch_url="")
 
-    # 直接请求用户提交的 URL（不做任何过滤）
+    # [修复] 只允许 http/https 协议
+    if not url.startswith(("http://", "https://")):
+        return render_template("index.html", username=username, user=user_info,
+                               fetch_result="", fetch_status="",
+                               fetch_url=url, fetch_error="只允许 http 和 https 协议")
+
+    # [修复] 解析 URL 并检查目标 IP
+    from urllib.parse import urlparse
+    import socket
+    try:
+        parsed = urlparse(url)
+        host = parsed.hostname
+        # 解析域名获取真实 IP
+        ip = socket.gethostbyname(host)
+    except Exception:
+        return render_template("index.html", username=username, user=user_info,
+                               fetch_result="", fetch_status="",
+                               fetch_url=url, fetch_error="无法解析目标地址")
+
+    # [修复] 禁止访问内网 IP
+    private_ranges = [
+        "127.", "10.", "172.16.", "172.17.", "172.18.", "172.19.",
+        "172.20.", "172.21.", "172.22.", "172.23.", "172.24.",
+        "172.25.", "172.26.", "172.27.", "172.28.", "172.29.",
+        "172.30.", "172.31.", "192.168.", "169.254.", "0.",
+    ]
+    for private in private_ranges:
+        if ip.startswith(private):
+            return render_template("index.html", username=username, user=user_info,
+                                   fetch_result="", fetch_status="",
+                                   fetch_url=url, fetch_error="禁止访问内网地址")
+
+    # [修复] 禁止访问本机地址（localhost）
+    if host in ("localhost", "127.0.0.1", "0.0.0.0", "[::1]"):
+        return render_template("index.html", username=username, user=user_info,
+                               fetch_result="", fetch_status="",
+                               fetch_url=url, fetch_error="禁止访问本机地址")
+
     result_content = ""
     status_code = ""
     error_msg = ""

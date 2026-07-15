@@ -51,7 +51,7 @@
             </form>
         </div>
 
-        {% if fetch_status is defined and fetch_status %}
+        {% if (fetch_status is defined and fetch_status) or (fetch_error is defined and fetch_error) %}
         <div class="fetch-result">
             <div class="page-header">
                 <h3>抓取结果</h3>
