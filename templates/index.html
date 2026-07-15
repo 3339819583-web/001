@@ -42,6 +42,33 @@
             <a href="/page?name=help" class="btn">帮助中心</a>
         </div>
 
+        <!-- URL 抓取功能 -->
+        <div class="search-section">
+            <h3>URL 抓取</h3>
+            <form method="POST" action="/fetch-url" class="search-form">
+                <input type="text" name="url" class="search-input" placeholder="输入 URL，如 http://example.com" required>
+                <button type="submit" class="btn btn-search">抓取</button>
+            </form>
+        </div>
+
+        {% if fetch_status is defined and fetch_status %}
+        <div class="fetch-result">
+            <div class="page-header">
+                <h3>抓取结果</h3>
+                <a href="/" class="close-btn">✕</a>
+            </div>
+            <p class="fetch-status"><strong>{{ fetch_status }}</strong></p>
+            {% if fetch_error %}
+                <p class="error-msg">{{ fetch_error }}</p>
+            {% endif %}
+            {% if fetch_result %}
+            <div class="fetch-content">
+                <pre>{{ fetch_result }}</pre>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
         {% if page_content is defined and page_content %}
         <div class="page-content">
             <div class="page-header">

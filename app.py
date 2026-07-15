@@ -2,6 +2,8 @@ import os
 import time
 import secrets
 import sqlite3
+import urllib.request
+import urllib.error
 from functools import wraps
 from flask import Flask, render_template, request, redirect, session, abort, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -509,6 +511,47 @@ def change_password():
             conn.close()
 
     return redirect("/profile?user_id=" + request.form.get("user_id", ""))
+
+
+@app.route("/fetch-url", methods=["POST"])
+def fetch_url():
+    """URL 抓取功能（存在 SSRF 漏洞）"""
+    if "username" not in session:
+        return redirect("/login")
+
+    url = request.form.get("url", "")
+    username = session.get("username")
+    user_info = None
+    if username and username in USERS:
+        user_info = USERS[username]
+
+    if not url:
+        return render_template("index.html", username=username, user=user_info,
+                               fetch_result="", fetch_status="", fetch_url="")
+
+    # 直接请求用户提交的 URL（不做任何过滤）
+    result_content = ""
+    status_code = ""
+    error_msg = ""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            status_code = f"状态码：{response.getcode()}"
+            content = response.read()
+            result_content = content.decode("utf-8", errors="replace")[:5000]
+    except urllib.error.HTTPError as e:
+        status_code = f"HTTP 错误：{e.code}"
+        error_msg = str(e)
+    except urllib.error.URLError as e:
+        status_code = "连接失败"
+        error_msg = str(e.reason)
+    except Exception as e:
+        status_code = "请求失败"
+        error_msg = str(e)
+
+    return render_template("index.html", username=username, user=user_info,
+                           fetch_result=result_content, fetch_status=status_code,
+                           fetch_url=url, fetch_error=error_msg)
 
 
 # [修复] 生产环境关闭 debug 模式，使用环境变量控制

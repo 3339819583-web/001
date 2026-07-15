@@ -468,3 +468,38 @@ body {
     margin-bottom: 12px;
     padding-left: 4px;
 }
+
+/* ========== URL 抓取结果 ========== */
+.fetch-result {
+    margin: 24px 0;
+    padding: 20px;
+    background: #f9f9ff;
+    border: 1px solid #e0e0ff;
+    border-radius: 10px;
+}
+
+.fetch-status {
+    font-size: 15px;
+    color: #27ae60;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: #e8f8f5;
+    border-radius: 6px;
+}
+
+.fetch-content {
+    max-height: 400px;
+    overflow-y: auto;
+    background: #1e1e1e;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.fetch-content pre {
+    color: #f0f0f0;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+}
