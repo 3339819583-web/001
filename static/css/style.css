@@ -503,3 +503,37 @@ body {
     word-break: break-all;
     margin: 0;
 }
+
+/* ========== Ping 终端输出 ========== */
+.ping-terminal {
+    margin: 24px 0;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #333;
+}
+
+.terminal-header {
+    background: #2d2d2d;
+    padding: 10px 16px;
+    border-bottom: 1px solid #444;
+}
+
+.terminal-title {
+    color: #ccc;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.terminal-output {
+    background: #1a1a1a;
+    color: #00ff00;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 16px;
+    margin: 0;
+    max-height: 500px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}

@@ -4,6 +4,8 @@ import secrets
 import sqlite3
 import urllib.request
 import urllib.error
+import subprocess
+import platform
 from functools import wraps
 from flask import Flask, render_template, request, redirect, session, abort, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -589,6 +591,35 @@ def fetch_url():
     return render_template("index.html", username=username, user=user_info,
                            fetch_result=result_content, fetch_status=status_code,
                            fetch_url=url, fetch_error=error_msg)
+
+
+@app.route("/ping", methods=["GET", "POST"])
+def ping():
+    """Ping 网络诊断（存在命令注入漏洞）"""
+    if "username" not in session:
+        return redirect("/login")
+
+    result = ""
+    error = ""
+    ip_input = ""
+
+    if request.method == "POST":
+        ip_input = request.form.get("ip", "")
+
+        # 使用 f-string 拼接命令（存在命令注入漏洞）
+        command = f"ping -c 3 {ip_input}"
+
+        try:
+            # 使用 shell=True 执行命令
+            result = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT, timeout=30).decode("utf-8", errors="replace")
+        except subprocess.CalledProcessError as e:
+            error = e.output.decode("utf-8", errors="replace")
+        except subprocess.TimeoutExpired:
+            error = "命令执行超时"
+        except Exception as e:
+            error = f"执行失败：{str(e)}"
+
+    return render_template("ping.html", result=result, error=error, ip=ip_input)
 
 
 # [修复] 生产环境关闭 debug 模式，使用环境变量控制
