@@ -595,7 +595,7 @@ def fetch_url():
 
 @app.route("/ping", methods=["GET", "POST"])
 def ping():
-    """Ping 网络诊断（存在命令注入漏洞）"""
+    """Ping 网络诊断"""
     if "username" not in session:
         return redirect("/login")
 
@@ -604,20 +604,26 @@ def ping():
     ip_input = ""
 
     if request.method == "POST":
-        ip_input = request.form.get("ip", "")
+        ip_input = request.form.get("ip", "").strip()
 
-        # 使用 f-string 拼接命令（存在命令注入漏洞）
-        command = f"ping -c 3 {ip_input}"
-
-        try:
-            # 使用 shell=True 执行命令
-            result = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT, timeout=30).decode("utf-8", errors="replace")
-        except subprocess.CalledProcessError as e:
-            error = e.output.decode("utf-8", errors="replace")
-        except subprocess.TimeoutExpired:
-            error = "命令执行超时"
-        except Exception as e:
-            error = f"执行失败：{str(e)}"
+        # [修复] 校验 IP 或域名格式（只允许字母数字和.-）
+        import re
+        if not re.match(r'^[a-zA-Z0-9\.\-]+$', ip_input):
+            error = "输入的 IP 地址或域名格式不合法"
+        else:
+            # [修复] 使用参数列表方式执行，禁用 shell=True
+            try:
+                result = subprocess.check_output(
+                    ["ping", "-c", "3", ip_input],
+                    stderr=subprocess.STDOUT,
+                    timeout=30
+                ).decode("utf-8", errors="replace")
+            except subprocess.CalledProcessError as e:
+                error = e.output.decode("utf-8", errors="replace")
+            except subprocess.TimeoutExpired:
+                error = "命令执行超时"
+            except Exception as e:
+                error = f"执行失败：{str(e)}"
 
     return render_template("ping.html", result=result, error=error, ip=ip_input)
 
