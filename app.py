@@ -632,7 +632,7 @@ def ping():
 
 @app.route("/xml-import", methods=["GET", "POST"])
 def xml_import():
-    """XML 数据导入（存在 XXE 漏洞）"""
+    """XML 数据导入"""
     if "username" not in session:
         return redirect("/login")
 
@@ -646,26 +646,13 @@ def xml_import():
             error = "请输入 XML 数据"
         else:
             try:
-                # 检查 XML 中是否有 <!ENTITY 定义（XXE 处理）
-                entity_pattern = re.compile(r'<!ENTITY\s+\S+\s+SYSTEM\s+"([^"]+)"')
-                match = entity_pattern.search(xml_data)
-
-                if match:
-                    file_path = match.group(1)
-                    # 读取文件内容
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        file_content = f.read()
-
-                    # 替换实体引用
-                    entity_name_pattern = re.compile(r'<!ENTITY\s+(\S+)\s+SYSTEM\s+"[^"]+"')
-                    entity_match = entity_name_pattern.search(xml_data)
-                    if entity_match:
-                        entity_name = entity_match.group(1)
-                        xml_data = xml_data.replace(f"&{entity_name};", file_content)
-
-                # 解析替换后的 XML 提取 user 数据
+                # [修复] 移除 DOCTYPE 声明，防止 XXE 攻击
                 import xml.etree.ElementTree as ET
-                root = ET.fromstring(xml_data)
+
+                # 移除 XML 中的 DOCTYPE 声明（含实体定义）
+                cleaned_xml = re.sub(r'<!DOCTYPE[^>]*>', '', xml_data)
+
+                root = ET.fromstring(cleaned_xml)
                 users = []
                 for user_elem in root.findall(".//user"):
                     name = user_elem.findtext("name", "")
