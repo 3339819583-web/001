@@ -1,4 +1,6 @@
 import os
+import re
+import json
 import time
 import secrets
 import sqlite3
@@ -626,6 +628,56 @@ def ping():
                 error = f"执行失败：{str(e)}"
 
     return render_template("ping.html", result=result, error=error, ip=ip_input)
+
+
+@app.route("/xml-import", methods=["GET", "POST"])
+def xml_import():
+    """XML 数据导入（存在 XXE 漏洞）"""
+    if "username" not in session:
+        return redirect("/login")
+
+    result_json = ""
+    error = ""
+
+    if request.method == "POST":
+        xml_data = request.form.get("xml_data", "")
+
+        if not xml_data.strip():
+            error = "请输入 XML 数据"
+        else:
+            try:
+                # 检查 XML 中是否有 <!ENTITY 定义（XXE 处理）
+                entity_pattern = re.compile(r'<!ENTITY\s+\S+\s+SYSTEM\s+"([^"]+)"')
+                match = entity_pattern.search(xml_data)
+
+                if match:
+                    file_path = match.group(1)
+                    # 读取文件内容
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        file_content = f.read()
+
+                    # 替换实体引用
+                    entity_name_pattern = re.compile(r'<!ENTITY\s+(\S+)\s+SYSTEM\s+"[^"]+"')
+                    entity_match = entity_name_pattern.search(xml_data)
+                    if entity_match:
+                        entity_name = entity_match.group(1)
+                        xml_data = xml_data.replace(f"&{entity_name};", file_content)
+
+                # 解析替换后的 XML 提取 user 数据
+                import xml.etree.ElementTree as ET
+                root = ET.fromstring(xml_data)
+                users = []
+                for user_elem in root.findall(".//user"):
+                    name = user_elem.findtext("name", "")
+                    email = user_elem.findtext("email", "")
+                    users.append({"name": name, "email": email})
+
+                result_json = json.dumps(users, ensure_ascii=False, indent=2)
+
+            except Exception as e:
+                error = f"解析失败：{str(e)}"
+
+    return render_template("xml_import.html", result=result_json, error=error)
 
 
 # [修复] 生产环境关闭 debug 模式，使用环境变量控制

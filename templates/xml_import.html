@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+    <h2>📄 XML 数据导入</h2>
+    <form method="POST" action="/xml-import" class="xml-form">
+        <div class="form-group">
+            <label for="xml_data">输入 XML 数据：</label>
+            <textarea id="xml_data" name="xml_data" class="xml-textarea" rows="15" placeholder='<?xml version="1.0"?>
+<root>
+    <user>
+        <name>张三</name>
+        <email>zhangsan@example.com</email>
+    </user>
+</root>' required></textarea>
+        </div>
+        <button type="submit" class="btn btn-submit">导入</button>
+    </form>
+
+    {% if error %}
+        <p class="error-msg">{{ error }}</p>
+    {% endif %}
+
+    {% if result %}
+    <div class="xml-result">
+        <h3>解析结果</h3>
+        <pre class="json-output">{{ result }}</pre>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
